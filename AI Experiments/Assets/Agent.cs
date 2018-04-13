@@ -1,196 +1,151 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
+using UnityEngine.UI;
 using System.Linq;
 
-public struct SystemState
-{
-    public int x, z;
-
-    public SystemState(int p1, int p2)
-    {
-        x = p1;
-        z = p2;
-    }
-}
-
-// North = +Z, depth
-// East = +X, width
-public enum Direction : int
-{
-    NORTH, EAST, SOUTH, WEST
-}
 
 public class Agent : MonoBehaviour
 {
+    [Range(1, 8000)]
     public int superSpeed = 50;
-    public int worldWidth = 5;
-    public int worldDepth = 5;
-    public float startEpsilon = 1.0f;
-    public float learningRate = 0.5f;
-    public float gamma = 0.99f;
-    public float moveReward = -0.1f;
-    public float punishment = -2.0f;
-    public float success = 10.0f;
-    public int numPunishments = 20;
-    public GameObject punishmentDisplay;
-    public GameObject floorObj;
 
-    private SystemState currentState_ = new SystemState(0, 0);
-    private float[][][] q_;
-    private Vector2Int[] bads_;
-    private Vector2Int succs_;
+    [Range(0f, 1f)]
+    public float startEpsilon = 1.0f;
+    [Range(0f, 1f)]
+    public float endEpsilon = 0.02f;
+    public int shiftTime = 10000;
+    [Range(0f, 3f)]
+    public double learningRate = 0.5f;
+    [Range(0f, 1f)]
+    public double gamma = 0.99f;
+
+    public Text textDisplay;
+
+    private double epsilon_;
+    private State currentState_ = new State(0, 0);
+    private State nextState_ = new State(0, 0);
+    private Environment e_;
+    private TabQ q_;
+    private int episodes_ = 0;
+    private int wins_ = 0;
+    private int fails_ = 0;
+    private double reward_ = 0;
+    private double lastReward_ = 0;
+    private double expected_ = 0;
+    private double bestReward_ = Mathf.NegativeInfinity;
+    private double sumReward_ = 0;
+
+    private StringBuilder sb_ = new StringBuilder();
 
 	// Use this for initialization
 	void Start()
     {
-        q_ = new float[worldWidth][][];
-        
-        // Initialize rewards
-        for (int i = 0; i < worldWidth; i++)
-        {
-            q_[i] = new float[worldDepth][];
-            for (int j = 0; j < worldDepth; j++)
-            {
-                q_[i][j] = new float[] { 0, 0, 0, 0 };
-            }
-        }
-
-        // Initialize punishments
-        bads_ = new Vector2Int[numPunishments];
-        for (int i = 0; i < numPunishments; i++) {
-            bads_[i].x = Random.Range(0, worldWidth);
-            bads_[i].y = Random.Range(0, worldDepth);
-
-            GameObject disp = GameObject.Instantiate(punishmentDisplay);
-            disp.transform.localPosition = new Vector3(bads_[i].x, 0.5f, bads_[i].y);
-        }
-
-        // Size the floor
-        floorObj.transform.localScale = new Vector3(worldWidth, 1.0f, worldDepth);
-        floorObj.transform.localPosition = new Vector3(worldWidth / 2.0f - 0.5f, -0.5f, worldDepth / 2.0f - 0.5f);
+        e_ = GetComponent<Environment>();
+        q_ = new TabQ(e_, 0.0f);
+        epsilon_ = startEpsilon;
+        Reset();
     }
 	
     void Reset()
     {
-        currentState_ = new SystemState(0, 0);
+        e_.GetStartState(currentState_);
+        reward_ = 0.0f;
     }
 
-	// Update is called once per frame
+    // Fixed update called reliably on timer
 	void FixedUpdate()
     {
-        Direction action;
-
+        Action action = null;
         for (int i = 0; i < superSpeed; i++)
         {
-            if (Random.Range(0.0f, 1.0f) > startEpsilon)
+            if (Random.Range(0.0f, 1.0f) > epsilon_)
             {
                 // Greedy choice
-                float best = -9999999;
-                int bestA = 0;
-                for (int a = 0; a < 4; a++)
-                {
-                    float qV = q_[currentState_.x][currentState_.z][a];
-                    if (qV > best)
-                    {
-                        best = qV;
-                        bestA = a;
-                    }
-                }
-                action = (Direction)bestA;
+                action = q_.ArgMax(currentState_);
+                expected_ = q_.Max(currentState_);
             }
             else
             {
-                action = (Direction)Random.Range(0, 4);
+                action = q_.ArgRand(currentState_);
             }
             TakeAction(action);
         }
 	}
 
-    void Update()
+    void TakeAction(Action a)
     {
-        UpdateVisible();
-    }
+        // Observe results of taking the action in our environment
+        double reward;
+        bool done;
+        e_.GetTransition(currentState_, nextState_, a, out reward, out done);
 
-    void TakeAction(Direction d)
-    {
-        SystemState newState = currentState_;
-        switch (d)
+        if (learningRate > 0)
         {
-            case Direction.NORTH:
-                newState.z++;
-                if (newState.z >= worldDepth)
-                {
-                    newState.z = worldDepth - 1;
-                }
-                break;
-            case Direction.EAST:
-                newState.x++;
-                if (newState.x >= worldWidth)
-                {
-                    newState.x = worldWidth - 1;
-                }
-                break;
-            case Direction.SOUTH:
-                newState.z--;
-                if (newState.z < 0)
-                {
-                    newState.z = 0;
-                }
-                break;
-            case Direction.WEST:
-                newState.x--;
-                if (newState.x < 0)
-                {
-                    newState.x = 0;
-                }
-                break;
+            // Learn from our mistakes (and successes)
+            Learn(currentState_, nextState_, a, reward, done);
         }
+        reward_ += reward;
 
-        // check for punishment
-        bool done = false;
-        float dR = moveReward;
-        for (int i = 0; i < numPunishments; i++)
-        {
-            if (bads_[i].x == newState.x && bads_[i].y == newState.z)
-            {
-                dR += punishment;
-                done = true;
-                break;
-            }
-        }
-        // check for success
-        if (newState.x == worldWidth - 1 && newState.z == worldDepth - 1)
-        {
-            dR += success;
-            done = true;
-        }
-        Learn(newState.x, newState.z, (int)d, dR, done);
-        currentState_ = newState;
-
+        // Episodic logic
         if (done)
         {
+            if (e_.IsReward(nextState_))
+            {
+                wins_++;
+            }
+            else if (e_.IsPunishment(nextState_))
+            {
+                fails_++;
+            }
+            episodes_++;
+            lastReward_ = reward_;
+            if (reward_ > bestReward_) bestReward_ = reward_;
+            sumReward_ += reward_;
+            epsilon_ = Mathf.Lerp(startEpsilon, endEpsilon, (float)episodes_ / shiftTime);
             Reset();
+        }
+        else
+        {
+            currentState_.Set(nextState_);
         }
     }
 
-    void UpdateVisible()
+    void Learn(State s0, State s1, Action a, double r, bool done)
+    {
+        if (done)
+        {
+            q_[s0, a] += learningRate * (r - q_[s0, a]);
+        }
+        else
+        {
+            q_[s0, a] += learningRate * (r + gamma * q_.Max(s1) - q_[s0, a]);
+        }
+    }
+
+    // Update is called once per frame - update display
+    void Update()
     {
         Vector3 localPos = transform.localPosition;
         localPos.x = currentState_.x;
         localPos.z = currentState_.z;
         transform.localPosition = localPos;
-    }
 
-    void Learn(int newX, int newZ, int action, float reward, bool done)
-    {
-        if (done)
-        {
-            q_[currentState_.x][currentState_.z][action] += learningRate * (reward - q_[currentState_.x][currentState_.z][action]);
-        }
-        else
-        {
-            q_[currentState_.x][currentState_.z][action] += learningRate * (reward + gamma * q_[newX][newZ].Max() - q_[currentState_.x][currentState_.z][action]);
-        }
+        // UI
+        sb_.Length = 0;
+        sb_.AppendFormat("Episodes: {0}", episodes_).AppendLine();
+        sb_.AppendFormat("Wins: {0}", wins_).AppendLine();
+        sb_.AppendFormat("Losses: {0}", fails_).AppendLine();
+        sb_.AppendFormat("Win/loss ratio: {0:F3}", (double)wins_/fails_).AppendLine();
+        sb_.AppendFormat("Current reward: {0:F2}", reward_).AppendLine();
+        sb_.AppendFormat("Expected reward: {0:F2}", expected_ + reward_).AppendLine();
+        sb_.AppendFormat("Last reward: {0:F2}", lastReward_).AppendLine();
+        sb_.AppendFormat("Best reward: {0:F2}", bestReward_).AppendLine();
+        sb_.AppendFormat("Avg reward: {0:F2}", sumReward_ / episodes_).AppendLine();
+        sb_.AppendFormat("Epsilon: {0:F3}", epsilon_).AppendLine();
+        textDisplay.text = sb_.ToString();
+
+        if (learningRate > 0) e_.RefreshFloorTexture(q_);
     }
 }
