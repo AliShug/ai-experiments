@@ -146,6 +146,6 @@ public class Agent : MonoBehaviour
         sb_.AppendFormat("Epsilon: {0:F3}", epsilon_).AppendLine();
         textDisplay.text = sb_.ToString();
 
-        if (learningRate > 0) e_.RefreshFloorTexture(q_);
+        e_.RefreshFloorTexture(q_);
     }
 }

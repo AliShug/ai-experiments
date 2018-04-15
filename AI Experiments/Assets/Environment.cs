@@ -7,8 +7,16 @@ enum Tile
 {
     EMPTY,
     START,
-    REWARD,
+    REWARD_A,
+    REWARD_B,
     PUNISHMENT
+}
+
+enum WorldType
+{
+    REWARDS_A,
+    REWARDS_B,
+    REWARDS_BOTH,
 }
 
 // North = +Z, depth
@@ -40,12 +48,15 @@ class Environment : MonoBehaviour
     public Camera camera;
     public double cameraHeight = 5.0f;
 
+    public bool randomizeReward = false;
     public bool randomStart = false;
     public Vector2Int startPos = new Vector2Int(0, 0);
 
     // World representation
     private Tile[][] world_;
     private Action[] actions_;
+    private WorldType worldType_ = WorldType.REWARDS_A;
+    private Knowledge curKnowledge_ = Knowledge.NONE;
 
     // Spawned object clean up
     private GameObject[] spawnedObjects_;
@@ -83,7 +94,7 @@ class Environment : MonoBehaviour
         world_[startPos.x][startPos.y] = Tile.START;
 
         // Initialize punishments and rewards
-        spawnedObjects_ = new GameObject[nPunishments + nRewards];
+        spawnedObjects_ = new GameObject[nPunishments + nRewards*2];
         for (int i = 0; i < nPunishments; i++)
         {
             bool valid = false;
@@ -113,7 +124,7 @@ class Environment : MonoBehaviour
                 z = Random.Range(0, depth);
                 if (world_[x][z] == Tile.EMPTY)
                 {
-                    world_[x][z] = Tile.REWARD;
+                    world_[x][z] = Tile.REWARD_A;
                     valid = true;
                 }
             } while (!valid);
@@ -121,6 +132,25 @@ class Environment : MonoBehaviour
             GameObject disp = GameObject.Instantiate(rewardDisplayObj);
             disp.transform.localPosition = new Vector3(x, 0.5f, z);
             spawnedObjects_[nPunishments + i] = disp;
+        }
+        for (int i = 0; i < nRewards; i++)
+        {
+            bool valid = false;
+            int x, z;
+            do
+            {
+                x = Random.Range(0, width);
+                z = Random.Range(0, depth);
+                if (world_[x][z] == Tile.EMPTY)
+                {
+                    world_[x][z] = Tile.REWARD_B;
+                    valid = true;
+                }
+            } while (!valid);
+
+            GameObject disp = GameObject.Instantiate(rewardDisplayObj);
+            disp.transform.localPosition = new Vector3(x, 0.5f, z);
+            spawnedObjects_[nPunishments + nRewards + i] = disp;
         }
 
         // Size the floor
@@ -166,6 +196,11 @@ class Environment : MonoBehaviour
         else
         {
             start.Set(startPos.x, startPos.y);
+        }
+
+        if (randomizeReward)
+        {
+            worldType_ = (WorldType) Random.Range(0, 3);
         }
     }
 
@@ -220,21 +255,59 @@ class Environment : MonoBehaviour
         // Calculate the reward, and determine if a final state was reached
         reward = moveCost;
         end = false;
-        if (IsReward(next))
+        if (worldType_ == WorldType.REWARDS_BOTH)
         {
-            reward += successReward;
-            end = true;
+            if (IsReward(next))
+            {
+                reward += successReward;
+                end = true;
+            }
         }
-        else if (IsPunishment(next))
+        else if (worldType_ == WorldType.REWARDS_A)
+        {
+            if (IsReward(next, Tile.REWARD_A))
+            {
+                reward += successReward;
+                end = true;
+            }
+            else if (IsReward(next, Tile.REWARD_B))
+            {
+                // Agent gets no reward, but now knows it's not in a REWARDS_B world
+                next.knows = Knowledge.VISITED_B;
+            }
+        }
+        else if (worldType_ == WorldType.REWARDS_B)
+        {
+            if (IsReward(next, Tile.REWARD_B))
+            {
+                reward += successReward;
+                end = true;
+            }
+            else if (IsReward(next, Tile.REWARD_A))
+            {
+                // Now knows it's not in a REWARDS_A world
+                next.knows = Knowledge.VISITED_A;
+            }
+        }
+
+        // Punishments are the same for all world types
+        if (IsPunishment(next))
         {
             reward += punishmentCost;
             end = true;
         }
+
+        curKnowledge_ = next.knows;
     }
 
     public bool IsReward(State s)
     {
-        return world_[s.x][s.z] == Tile.REWARD;
+        return world_[s.x][s.z] == Tile.REWARD_A || world_[s.x][s.z] == Tile.REWARD_B;
+    }
+
+    public bool IsReward(State s, Tile rewardType = Tile.REWARD_A)
+    {
+        return world_[s.x][s.z] == rewardType;
     }
 
     public bool IsPunishment(State s)
@@ -253,7 +326,7 @@ class Environment : MonoBehaviour
         {
             for (int x = 0; x < floorTexture_.width; x++)
             {
-                float val = (float)q.Max(x, y);
+                float val = (float)q.Max(x, y, curKnowledge_);
                 if (val > 0 && val < 5)
                 {
                     Color color = Color.LerpUnclamped(Color.gray, Color.yellow, val/5);

@@ -81,14 +81,15 @@ class TabQ
             }
         }
 
-        if (nBest > 1)
+        return e_.GetActions()[bestI];
+        /*if (nBest > 1)
         {
             return ArgRand(s);
         }
         else
         {
             return e_.GetActions()[bestI];
-        }
+        }*/
     }
 
     public Action ArgRand(State s)
@@ -112,10 +113,10 @@ class TabQ
         return best;
     }
 
-    public double Max(int x, int z)
+    public double Max(int x, int z, Knowledge knows)
     {
         double best = Mathf.NegativeInfinity;
-        int k = IndexToKey(x, z);
+        int k = IndexToKey(x, z, (int) knows);
         for (int i = 0; i < nActions_; i++)
         {
             double v = SafeGet(k)[i];
@@ -128,10 +129,10 @@ class TabQ
         return best;
     }
 
-    public double Avg(int x, int z)
+    public double Avg(int x, int z, Knowledge knows)
     {
         double sum = 0.0f;
-        int k = IndexToKey(x, z);
+        int k = IndexToKey(x, z, (int) knows);
         for (int i = 0; i < nActions_; i++)
         {
             sum += SafeGet(k)[i];
@@ -142,11 +143,11 @@ class TabQ
 
     private int StateToKey(State s)
     {
-        return s.x * width_ + s.z;
+        return IndexToKey(s.x, s.z, (int) s.knows);
     }
 
-    private int IndexToKey(int x, int z)
+    private int IndexToKey(int x, int z, int k)
     {
-        return x * width_ + z;
+        return x* width_ + z + (width_ * depth_ * k);
     }
 }
