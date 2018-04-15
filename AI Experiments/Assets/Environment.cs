@@ -3,7 +3,7 @@ using System.Linq;
 using UnityEngine;
 using UnityEditor;
 
-enum Tile
+public enum Tile
 {
     EMPTY,
     START,
@@ -12,7 +12,7 @@ enum Tile
     PUNISHMENT
 }
 
-enum WorldType
+public enum WorldType
 {
     REWARDS_A,
     REWARDS_B,
@@ -27,7 +27,7 @@ public enum Direction : int
 }
 
 [ExecuteInEditMode]
-class Environment : MonoBehaviour
+public class Environment : MonoBehaviour
 {
     [Range(3, 200)]
     public int width = 10, depth = 10;
@@ -43,7 +43,7 @@ class Environment : MonoBehaviour
     public int nPunishments = 5;
 
     public GameObject punishmentDisplayObj;
-    public GameObject rewardDisplayObj;
+    public GameObject rewardADisplayObj, rewardBDisplayObj;
     public GameObject floorObj;
     public Camera camera;
     public double cameraHeight = 5.0f;
@@ -52,14 +52,15 @@ class Environment : MonoBehaviour
     public bool randomStart = false;
     public Vector2Int startPos = new Vector2Int(0, 0);
 
+    public bool displayExpectedReward = false;
+
     // World representation
     private Tile[][] world_;
     private Action[] actions_;
     private WorldType worldType_ = WorldType.REWARDS_A;
-    private Knowledge curKnowledge_ = Knowledge.NONE;
 
-    // Spawned object clean up
-    private GameObject[] spawnedObjects_;
+    // Spawned object logic
+    private GameObject floor_;
     private bool initialized_ = false;
     private bool dirty_ = false;
 
@@ -68,10 +69,7 @@ class Environment : MonoBehaviour
 
     private void Start()
     {
-        if (initialized_)
-        {
-            Clear();
-        }
+        Clear();
 
         // Initialize actions
         actions_ = new Action[] {
@@ -94,7 +92,6 @@ class Environment : MonoBehaviour
         world_[startPos.x][startPos.y] = Tile.START;
 
         // Initialize punishments and rewards
-        spawnedObjects_ = new GameObject[nPunishments + nRewards*2];
         for (int i = 0; i < nPunishments; i++)
         {
             bool valid = false;
@@ -110,9 +107,8 @@ class Environment : MonoBehaviour
                 }
             } while (!valid);
 
-            GameObject disp = GameObject.Instantiate(punishmentDisplayObj);
+            GameObject disp = GameObject.Instantiate(punishmentDisplayObj, transform);
             disp.transform.localPosition = new Vector3(x, 0.5f, z);
-            spawnedObjects_[i] = disp;
         }
         for (int i = 0; i < nRewards; i++)
         {
@@ -129,9 +125,8 @@ class Environment : MonoBehaviour
                 }
             } while (!valid);
 
-            GameObject disp = GameObject.Instantiate(rewardDisplayObj);
+            GameObject disp = GameObject.Instantiate(rewardADisplayObj, transform);
             disp.transform.localPosition = new Vector3(x, 0.5f, z);
-            spawnedObjects_[nPunishments + i] = disp;
         }
         for (int i = 0; i < nRewards; i++)
         {
@@ -148,18 +143,18 @@ class Environment : MonoBehaviour
                 }
             } while (!valid);
 
-            GameObject disp = GameObject.Instantiate(rewardDisplayObj);
+            GameObject disp = GameObject.Instantiate(rewardBDisplayObj, transform);
             disp.transform.localPosition = new Vector3(x, 0.5f, z);
-            spawnedObjects_[nPunishments + nRewards + i] = disp;
         }
 
-        // Size the floor
-        floorObj.transform.localScale = new Vector3(width, 1.0f, depth);
-        floorObj.transform.localPosition = new Vector3(width / 2.0f - 0.5f, -0.5f, depth / 2.0f - 0.5f);
+        // Create and size the floor
+        floor_ = Instantiate(floorObj, transform);
+        floor_.transform.localScale = new Vector3(width, 1.0f, depth);
+        floor_.transform.localPosition = new Vector3(width / 2.0f - 0.5f, -0.5f, depth / 2.0f - 0.5f);
 
         // Fuck with the floor coloring
         floorTexture_ = new Texture2D(width, depth);
-        floorObj.GetComponent<Renderer>().material.mainTexture = floorTexture_;
+        floor_.GetComponent<Renderer>().sharedMaterial.mainTexture = floorTexture_;
 
         for (int y = 0; y < floorTexture_.height; y++)
         {
@@ -296,8 +291,6 @@ class Environment : MonoBehaviour
             reward += punishmentCost;
             end = true;
         }
-
-        curKnowledge_ = next.knows;
     }
 
     public bool IsReward(State s)
@@ -320,27 +313,34 @@ class Environment : MonoBehaviour
         return actions_;
     }
 
-    public void RefreshFloorTexture(TabQ q)
+    public void RefreshFloorTexture(TabQ q, State s)
     {
         for (int y = 0; y < floorTexture_.height; y++)
         {
             for (int x = 0; x < floorTexture_.width; x++)
             {
-                float val = (float)q.Max(x, y, curKnowledge_);
-                if (val > 0 && val < 5)
+                if (displayExpectedReward)
                 {
-                    Color color = Color.LerpUnclamped(Color.gray, Color.yellow, val/5);
-                    floorTexture_.SetPixel(x, y, color);
-                }
-                else if (val >= 5)
-                {
-                    Color color = Color.LerpUnclamped(Color.yellow, Color.white, (val-5)/5);
-                    floorTexture_.SetPixel(x, y, color);
+                    float val = (float)q.Max(x, y, s.knows);
+                    if (val > 0 && val < 5)
+                    {
+                        Color color = Color.LerpUnclamped(Color.gray, Color.yellow, val / 5);
+                        floorTexture_.SetPixel(x, y, color);
+                    }
+                    else if (val >= 5)
+                    {
+                        Color color = Color.LerpUnclamped(Color.yellow, Color.white, (val - 5) / 5);
+                        floorTexture_.SetPixel(x, y, color);
+                    }
+                    else
+                    {
+                        Color color = Color.LerpUnclamped(Color.black, Color.red, -val);
+                        floorTexture_.SetPixel(x, y, color);
+                    }
                 }
                 else
                 {
-                    Color color = Color.LerpUnclamped(Color.black, Color.red, -val);
-                    floorTexture_.SetPixel(x, y, color);
+                    floorTexture_.SetPixel(x, y, Color.black);
                 }
             }
         }
@@ -360,12 +360,9 @@ class Environment : MonoBehaviour
 
     private void Clear()
     {
-        if (spawnedObjects_ != null)
+        while (transform.childCount > 0)
         {
-            foreach (GameObject o in spawnedObjects_)
-            {
-                DestroyImmediate(o);
-            }
+            DestroyImmediate(transform.GetChild(0).gameObject);
         }
         initialized_ = false;
     }

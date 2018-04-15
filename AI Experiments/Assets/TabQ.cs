@@ -3,7 +3,7 @@ using System.Linq;
 using System.Text;
 using UnityEngine;
 
-class TabQ
+public class TabQ
 {
     private Dictionary<int, double[]> q_ = new Dictionary<int, double[]>();
     private int width_, depth_, nActions_;
@@ -148,6 +148,6 @@ class TabQ
 
     private int IndexToKey(int x, int z, int k)
     {
-        return x* width_ + z + (width_ * depth_ * k);
+        return x* depth_ + z + (width_ * depth_ * k);
     }
 }

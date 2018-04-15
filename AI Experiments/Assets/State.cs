@@ -3,14 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-enum Knowledge : int
+public enum Knowledge : int
 {
     NONE,
     VISITED_A,
     VISITED_B,
 }
 
-class State
+public class State
 {
     public int x, z;
     public Knowledge knows = Knowledge.NONE; 
