@@ -8,23 +8,31 @@ using System.Linq;
 
 public class Agent : MonoBehaviour
 {
-    [Range(1, 8000)]
+    public int stopAfter = 1000000;
+    public int epsilonZeroPeriod = 50000;
+
+    [Range(1, 50000)]
     public int superSpeed = 50;
 
     [Range(0f, 1f)]
     public float startEpsilon = 1.0f;
     [Range(0f, 1f)]
     public float endEpsilon = 0.02f;
-    public int epsilonShiftEpisodes = 10000;
     [Range(0f, 1f)]
-    public double learningRate = 0.2f;
+    public float epsilonDecay = 0.001f;
+    [Range(0f, 1f)]
+    public float startLearningRate = 0.5f;
+    [Range(0f, 1f)]
+    public float endLearningRate = 0.0f;
+    [Range(0f, 1f)]
+    public float learningDecay = 0.0001f;
     [Range(0f, 1f)]
     public double gamma = 0.99f;
 
     public Text textDisplay;
     public Environment env;
 
-    private double epsilon_;
+    private double epsilon_, alpha_;
     private State currentState_ = new State(0, 0);
     private State nextState_ = new State(0, 0);
     private TabQ q_;
@@ -37,10 +45,11 @@ public class Agent : MonoBehaviour
     private double bestReward_ = Mathf.NegativeInfinity;
     private double sumReward_ = 0;
 
-    private const int nSaves_ = 500;
+    private const int nSaves_ = 1000;
     private double[] savedRewards_ = new double[nSaves_];
     private bool[] savedWins_ = new bool[nSaves_];
     private int saveInd_ = 0;
+    private bool stopped = false;
 
     private StringBuilder sb_ = new StringBuilder();
     private TrailRenderer trail_;
@@ -87,7 +96,7 @@ public class Agent : MonoBehaviour
         bool done;
         env.GetTransition(currentState_, nextState_, a, out reward, out done);
 
-        if (learningRate > 0)
+        if (alpha_ > 0f)
         {
             // Learn from our mistakes (and successes)
             Learn(currentState_, nextState_, a, reward, done);
@@ -108,9 +117,10 @@ public class Agent : MonoBehaviour
         }
         else
         {
-            if (reward_ < -1000)
+            if (reward_ < -50)
             {
                 // Early termination
+                Learn(currentState_, nextState_, a, env.punishmentCost, true);
                 EndEpisode(false, reward_);
             }
             else
@@ -124,11 +134,11 @@ public class Agent : MonoBehaviour
     {
         if (done)
         {
-            q_[s0, a] += learningRate * (r - q_[s0, a]);
+            q_[s0, a] = (1 - alpha_) * q_[s0, a] + alpha_ * r;
         }
         else
         {
-            q_[s0, a] += learningRate * (r + gamma * q_.Max(s1) - q_[s0, a]);
+            q_[s0, a] = (1 - alpha_) * q_[s0, a] + alpha_ * (r + gamma * q_.Max(s1));
         }
     }
 
@@ -146,7 +156,7 @@ public class Agent : MonoBehaviour
         for (int i = 0; i < nSaves_; i++)
         {
             sum += savedRewards_[i];
-            wins += savedWins_[i] ? 1 : 0;
+            wins += (savedWins_[i] ? 1 : 0);
         }
         int fails = nSaves_ - wins;
 
@@ -157,11 +167,17 @@ public class Agent : MonoBehaviour
         sb_.AppendFormat("Losses: {0}", fails_).AppendLine();
         sb_.AppendFormat("Current reward: {0:F2}", reward_).AppendLine();
         sb_.AppendFormat("Expected reward: {0:F2}", expected_ + reward_).AppendLine();
+        sb_.AppendFormat("Qmax expected future reward: {0:F2}", expected_).AppendLine();
         sb_.AppendFormat("Last reward: {0:F2}", lastReward_).AppendLine();
         sb_.AppendFormat("Best reward: {0:F2}", bestReward_).AppendLine();
         sb_.AppendFormat("Last {1} W/L: {0:F3}", (double)wins/fails, nSaves_).AppendLine();
         sb_.AppendFormat("Last {1} average: {0:F2}", sum / nSaves_, nSaves_).AppendLine();
+        sb_.AppendFormat("Alpha: {0:F3}", alpha_).AppendLine();
         sb_.AppendFormat("Epsilon: {0:F3}", epsilon_).AppendLine();
+        if (stopped)
+        {
+            sb_.AppendLine("TRAINED!");
+        }
         textDisplay.text = sb_.ToString();
 
         env.RefreshFloorTexture(q_, currentState_);
@@ -169,7 +185,8 @@ public class Agent : MonoBehaviour
 
     private void EndEpisode(bool win, double reward)
     {
-        epsilon_ = Mathf.Lerp(startEpsilon, endEpsilon, (float)episodes_ / epsilonShiftEpisodes);
+        epsilon_ = endEpsilon + (startEpsilon-endEpsilon) * Mathf.Pow(1f-epsilonDecay, episodes_);
+        alpha_ = endLearningRate + (startLearningRate - endLearningRate) * Mathf.Pow(1f - learningDecay, episodes_);
         episodes_++;
         lastReward_ = reward;
         if (reward_ > bestReward_) bestReward_ = reward;
@@ -186,6 +203,15 @@ public class Agent : MonoBehaviour
         savedRewards_[saveInd_] = reward;
         savedWins_[saveInd_] = win;
         saveInd_ = (saveInd_ + 1) % nSaves_;
+
+        // Learning stop logic
+        if (!stopped && episodes_ > stopAfter)
+        {
+            alpha_ = endLearningRate = startLearningRate = 0;
+            epsilon_ = startEpsilon = endEpsilon = 0;
+            superSpeed = 1;
+            stopped = true;
+        }
 
         Reset();
     }

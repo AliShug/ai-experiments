@@ -58,6 +58,32 @@ public class TabQ
         nActions_ = e.GetActions().Length;
     }
 
+    public int ArgMax(int x, int z, Knowledge knows)
+    {
+        double best = Mathf.NegativeInfinity;
+        int bestI = 0;
+        int k = IndexToKey(x, z, (int) knows);
+        int nBest = 0;
+
+        for (int i = 0; i < nActions_; i++)
+        {
+            double v = SafeGet(k)[i];
+            if (v > best)
+            {
+                nBest = 1;
+                best = v;
+                bestI = i;
+                nBest = 1;
+            }
+            else if (v == best)
+            {
+                nBest++;
+            }
+        }
+
+        return bestI;
+    }
+
     public Action ArgMax(State s)
     {
         double best = Mathf.NegativeInfinity;

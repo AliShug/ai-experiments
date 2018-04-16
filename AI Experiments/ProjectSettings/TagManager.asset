@@ -3,7 +3,12 @@
 --- !u!78 &1
 TagManager:
   serializedVersion: 2
-  tags: []
+  tags:
+  - Tile_Punishment
+  - Tile_Reward_A
+  - Tile_Reward_B
+  - FloorObj
+  - Tile_Wall
   layers:
   - Default
   - TransparentFX
