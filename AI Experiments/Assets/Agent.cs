@@ -8,6 +8,7 @@ using System.Linq;
 
 public class Agent : MonoBehaviour
 {
+    public bool learning = true;
     public int stopAfter = 1000000;
     public int epsilonZeroPeriod = 50000;
 
@@ -75,7 +76,7 @@ public class Agent : MonoBehaviour
         Action action = null;
         for (int i = 0; i < superSpeed; i++)
         {
-            if (Random.Range(0.0f, 1.0f) > epsilon_)
+            if (!learning || Random.Range(0.0f, 1.0f) > epsilon_)
             {
                 // Greedy choice
                 action = q_.ArgMax(currentState_);
@@ -96,7 +97,7 @@ public class Agent : MonoBehaviour
         bool done;
         env.GetTransition(currentState_, nextState_, a, out reward, out done);
 
-        if (alpha_ > 0f)
+        if (learning && alpha_ > 0f)
         {
             // Learn from our mistakes (and successes)
             Learn(currentState_, nextState_, a, reward, done);
@@ -120,7 +121,6 @@ public class Agent : MonoBehaviour
             if (reward_ < -50)
             {
                 // Early termination
-                Learn(currentState_, nextState_, a, env.punishmentCost, true);
                 EndEpisode(false, reward_);
             }
             else
@@ -207,10 +207,9 @@ public class Agent : MonoBehaviour
         // Learning stop logic
         if (!stopped && episodes_ > stopAfter)
         {
-            alpha_ = endLearningRate = startLearningRate = 0;
-            epsilon_ = startEpsilon = endEpsilon = 0;
             superSpeed = 1;
             stopped = true;
+            learning = false;
         }
 
         Reset();

@@ -9,10 +9,7 @@ public class EnvironmentEditor : Editor {
     public override void OnInspectorGUI()
     {
         Environment env = (Environment)target;
-        if (GUILayout.Button("Randomize"))
-        {
-            env.GenerateRandomWorld();
-        }
+
         if (GUILayout.Button("Clear"))
         {
             env.Clear();

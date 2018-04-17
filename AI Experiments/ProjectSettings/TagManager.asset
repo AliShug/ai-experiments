@@ -9,6 +9,7 @@ TagManager:
   - Tile_Reward_B
   - FloorObj
   - Tile_Wall
+  - Spawn_Point
   layers:
   - Default
   - TransparentFX
@@ -18,7 +19,7 @@ TagManager:
   - UI
   - 
   - 
-  - 
+  - Agent
   - 
   - 
   - 

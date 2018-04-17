@@ -27,6 +27,14 @@ public enum Direction : int
     NORTH, EAST, SOUTH, WEST
 }
 
+public enum RewardMode : int
+{
+    Reward_A,
+    Reward_B,
+    Reward_Both,
+    Reward_Random,
+}
+
 [ExecuteInEditMode]
 public class Environment : MonoBehaviour
 {
@@ -40,23 +48,15 @@ public class Environment : MonoBehaviour
     // How likely we are to end up in an adjacent square
     public double slidiness = 0.1f;
 
-    public int nRewards = 2;
-    public int nPunishments = 5;
-
-    public GameObject punishmentDisplayObj;
-    public GameObject rewardADisplayObj, rewardBDisplayObj;
-    public GameObject floorObj;
     public Camera camera;
-    public double cameraHeight = 5.0f;
 
-    public bool randomizeReward = false;
-    public bool randomStart = false;
-    public Vector2Int startPos = new Vector2Int(0, 0);
+    public RewardMode rewardMode = RewardMode.Reward_Both;
 
     public bool displayExpectedReward = false;
     public bool displayPolicy = false;
 
     // World representation
+    private List<Vector2Int> spawns_ = new List<Vector2Int>();
     private Tile[][] world_;
     private Action[] actions_;
     private WorldType worldType_ = WorldType.REWARDS_BOTH;
@@ -67,79 +67,6 @@ public class Environment : MonoBehaviour
 
     // Floor texture
     Texture2D floorTexture_;
-
-    public void GenerateRandomWorld()
-    {
-        Clear();
-
-        // Initialize the world
-        world_ = new Tile[width][];
-        for (int x = 0; x < width; x++)
-        {
-            world_[x] = new Tile[depth];
-            for (int z = 0; z < depth; z++)
-            {
-                world_[x][z] = Tile.EMPTY;
-            }
-        }
-        world_[startPos.x][startPos.y] = Tile.START;
-
-        // Initialize punishments and rewards
-        for (int i = 0; i < nPunishments; i++)
-        {
-            bool valid = false;
-            int x, z;
-            do
-            {
-                x = Random.Range(0, width);
-                z = Random.Range(0, depth);
-                if (world_[x][z] == Tile.EMPTY)
-                {
-                    world_[x][z] = Tile.PUNISHMENT;
-                    valid = true;
-                }
-            } while (!valid);
-
-            GameObject disp = GameObject.Instantiate(punishmentDisplayObj, transform);
-            disp.transform.localPosition = new Vector3(x, 0.5f, z);
-        }
-        for (int i = 0; i < nRewards; i++)
-        {
-            bool valid = false;
-            int x, z;
-            do
-            {
-                x = Random.Range(0, width);
-                z = Random.Range(0, depth);
-                if (world_[x][z] == Tile.EMPTY)
-                {
-                    world_[x][z] = Tile.REWARD_A;
-                    valid = true;
-                }
-            } while (!valid);
-
-            GameObject disp = GameObject.Instantiate(rewardADisplayObj, transform);
-            disp.transform.localPosition = new Vector3(x, 0.5f, z);
-        }
-        for (int i = 0; i < nRewards; i++)
-        {
-            bool valid = false;
-            int x, z;
-            do
-            {
-                x = Random.Range(0, width);
-                z = Random.Range(0, depth);
-                if (world_[x][z] == Tile.EMPTY)
-                {
-                    world_[x][z] = Tile.REWARD_B;
-                    valid = true;
-                }
-            } while (!valid);
-
-            GameObject disp = GameObject.Instantiate(rewardBDisplayObj, transform);
-            disp.transform.localPosition = new Vector3(x, 0.5f, z);
-        }
-    }
 
     public void LoadExistingWorld()
     {
@@ -180,6 +107,10 @@ public class Environment : MonoBehaviour
             {
                 world_[(int)child.localPosition.x][(int)child.localPosition.z] = Tile.WALL;
             }
+            else if (obj.tag == "Spawn_Point")
+            {
+                spawns_.Add(new Vector2Int((int)child.localPosition.x, (int)child.localPosition.z));
+            }
         }
 
         // Size the floor correctly
@@ -200,8 +131,8 @@ public class Environment : MonoBehaviour
         LoadExistingWorld();
 
         // Place and size camera
-        camera.orthographicSize = Mathf.Max(width, depth) / 2;
-        camera.transform.localPosition = new Vector3(width / 2.0f - 0.5f, 50f, depth / 2.0f - 0.5f);
+        camera.orthographicSize = Mathf.Max(width, depth) / 2 + 1;
+        camera.transform.parent.localPosition = new Vector3(width / 2.0f - 0.5f, 0f, depth / 2.0f - 0.5f);
 
         InitFloorTexture();
     }
@@ -209,33 +140,16 @@ public class Environment : MonoBehaviour
     // Modifies the state 'start' to be the starting state
     public void GetStartState(State start)
     {
-        if (randomStart)
-        {
-            bool valid = false;
-            int x, z;
-            do
-            {
-                x = Random.Range(0, width);
-                z = Random.Range(0, depth);
-                if (world_[x][z] == Tile.EMPTY || world_[x][z] == Tile.START)
-                {
-                    valid = true;
-                }
-            } while (!valid);
-            start.Set(x, z);
-        }
-        else
-        {
-            start.Set(startPos.x, startPos.y);
-        }
+        Vector2Int selected = spawns_[Random.Range(0, spawns_.Count)];
+        start.Set(selected.x, selected.y);
 
-        if (randomizeReward)
+        if (rewardMode == RewardMode.Reward_Random)
         {
             worldType_ = (WorldType) Random.Range(0, 2);
         }
         else
         {
-            worldType_ = WorldType.REWARDS_BOTH;
+            worldType_ = (WorldType) rewardMode;
         }
     }
 
@@ -493,13 +407,22 @@ public class Environment : MonoBehaviour
 
     public void Clear()
     {
-        while (transform.childCount > 0)
+        bool deleted = true;
+        while (deleted)
         {
-            DestroyImmediate(transform.GetChild(0).gameObject);
+            deleted = false;
+            foreach (Transform child in transform)
+            {
+                if (child.tag != "FloorObj")
+                {
+                    DestroyImmediate(child.gameObject);
+                    deleted = true;
+                    break;
+                }
+            }
         }
 
         // Create and size the floor
-        floor_ = Instantiate(floorObj, transform);
         floor_.transform.localScale = new Vector3(width, 1.0f, depth);
         floor_.transform.localPosition = new Vector3(width / 2.0f - 0.5f, -0.5f, depth / 2.0f - 0.5f);
     }
@@ -507,19 +430,6 @@ public class Environment : MonoBehaviour
     private void OnValidate()
     {
         dirty_ = true;
-
-        if (nPunishments + nRewards > width * depth - 2)
-        {
-            nPunishments = width * depth - 2 - nRewards;
-        }
-        if (nPunishments < 0)
-        {
-            nPunishments = 0;
-        }
-        if (nRewards > width * depth - 2)
-        {
-            nRewards = width * depth - 2;
-        }
 
         if (width > 200)
         {
