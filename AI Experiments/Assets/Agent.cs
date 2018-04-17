@@ -14,6 +14,8 @@ public class Agent : MonoBehaviour
 
     [Range(1, 50000)]
     public int superSpeed = 50;
+    [Range(1, 10)]
+    public int slowDown = 1;
 
     [Range(0f, 1f)]
     public float startEpsilon = 1.0f;
@@ -53,6 +55,8 @@ public class Agent : MonoBehaviour
     private int saveInd_ = 0;
     private bool stopped = false;
 
+    private int skippy_ = 0;
+
     private StringBuilder sb_ = new StringBuilder();
     private StatTracker tracker_;
 
@@ -77,17 +81,22 @@ public class Agent : MonoBehaviour
     // Fixed update called reliably on timer
 	void FixedUpdate()
     {
+        // Slow down! *snap* my man
+        skippy_ = (skippy_ + 1) % slowDown;
+        if (skippy_ != 0) return;
+
         Action action = null;
         for (int i = 0; i < superSpeed; i++)
         {
             if (!learning || Random.Range(0.0f, 1.0f) > epsilon_)
             {
-                // Greedy choice
+                // Greedy choice is the on-policy action
                 action = q_.ArgMax(currentState_);
                 expected_ = q_.Max(currentState_);
             }
             else
             {
+                // Off-policy exploration
                 action = q_.ArgRand(currentState_);
             }
             TakeAction(action);
