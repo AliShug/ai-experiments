@@ -45,6 +45,7 @@ public class Agent : MonoBehaviour
     private double expected_ = 0;
     private double bestReward_ = Mathf.NegativeInfinity;
     private double sumReward_ = 0;
+    private int steps_ = 0;
 
     private const int nSaves_ = 1000;
     private double[] savedRewards_ = new double[nSaves_];
@@ -53,14 +54,16 @@ public class Agent : MonoBehaviour
     private bool stopped = false;
 
     private StringBuilder sb_ = new StringBuilder();
-    private TrailRenderer trail_;
+    private StatTracker tracker_;
 
 	// Use this for initialization
 	void Start()
     {
-        trail_ = GetComponent<TrailRenderer>();
+        tracker_ = GetComponent<StatTracker>();
         q_ = new TabQ(env, 0.0f);
         epsilon_ = startEpsilon;
+
+        tracker_.StartRun(this);
         Reset();
     }
 	
@@ -68,6 +71,7 @@ public class Agent : MonoBehaviour
     {
         env.GetStartState(currentState_);
         reward_ = 0.0f;
+        steps_ = 0;
     }
 
     // Fixed update called reliably on timer
@@ -96,6 +100,7 @@ public class Agent : MonoBehaviour
         double reward;
         bool done;
         env.GetTransition(currentState_, nextState_, a, out reward, out done);
+        steps_++;
 
         if (learning && alpha_ > 0f)
         {
@@ -185,6 +190,15 @@ public class Agent : MonoBehaviour
 
     private void EndEpisode(bool win, double reward)
     {
+        if (learning)
+        {
+            tracker_.SaveEpisode(reward, win, steps_, epsilon_, alpha_);
+        }
+        else if (episodes_ < stopAfter + epsilonZeroPeriod)
+        {
+            tracker_.SaveEpisode(reward, win, steps_, 0, alpha_);
+        }
+
         epsilon_ = endEpsilon + (startEpsilon-endEpsilon) * Mathf.Pow(1f-epsilonDecay, episodes_);
         alpha_ = endLearningRate + (startLearningRate - endLearningRate) * Mathf.Pow(1f - learningDecay, episodes_);
         episodes_++;
@@ -204,11 +218,17 @@ public class Agent : MonoBehaviour
         savedWins_[saveInd_] = win;
         saveInd_ = (saveInd_ + 1) % nSaves_;
 
+
         // Learning stop logic
-        if (!stopped && episodes_ > stopAfter)
+        if (!stopped && episodes_ >= stopAfter + epsilonZeroPeriod)
         {
+            tracker_.EndRun();
             superSpeed = 1;
             stopped = true;
+            learning = false;
+        }
+        else if (!stopped && episodes_ >= stopAfter)
+        {
             learning = false;
         }
 
