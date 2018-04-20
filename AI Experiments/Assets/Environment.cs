@@ -329,28 +329,31 @@ public class Environment : MonoBehaviour
         floorTexture_.Apply();
     }
 
-    private Action actionSlot;
     public void RefreshFloorTexture(TabQ q, State s)
     {
+        State temp = new State();
+        temp.Set(s);
         for (int z = 0; z < depth; z++)
         {
+            temp.z = z;
             for (int x = 0; x < width; x++)
             {
+                temp.x = x;
                 Color color;
                 if (displayExpectedReward)
                 {
-                    float val = (float)q.Max(x, z, s.knows);
-                    if (val > 0 && val < 5)
+                    float val = (float)q.Max(temp);
+                    if (val > 0 && val < 10)
                     {
-                        color = Color.LerpUnclamped(Color.gray, Color.yellow, val / 5);
+                        color = Color.LerpUnclamped(Color.blue, Color.yellow, val / 10);
                     }
-                    else if (val >= 5)
+                    else if (val >= 10)
                     {
-                        color = Color.LerpUnclamped(Color.yellow, Color.white, (val - 5) / 5);
+                        color = Color.LerpUnclamped(Color.yellow, Color.white, (val - 10) / 10);
                     }
                     else
                     {
-                        color = Color.LerpUnclamped(Color.black, Color.red, -val);
+                        color = Color.LerpUnclamped(Color.black, Color.red, -val/10);
                     }
                 }
                 else
@@ -368,7 +371,7 @@ public class Environment : MonoBehaviour
                 // Show Q direction
                 if (displayPolicy)
                 {
-                    Direction d = (Direction)q.ArgMax(x, z, s.knows);
+                    Direction d = (Direction) q.ArgMax(temp).iVal;
                     switch (d)
                     {
                         case Direction.NORTH:

@@ -5,19 +5,19 @@ using UnityEngine;
 
 public class TabQ
 {
-    private Dictionary<int, double[]> q_ = new Dictionary<int, double[]>();
+    private Dictionary<State, double[]> q_ = new Dictionary<State, double[]>();
     private int width_, depth_, nActions_;
     private double startVal_;
     private Environment e_;
+    private State localState_ = new State();
 
     public double this[State s, Action a]
     {
         get
         {
-            int k = StateToKey(s);
-            if (q_.ContainsKey(k))
+            if (q_.ContainsKey(s))
             {
-                return q_[k][a.iVal];
+                return q_[s][a.iVal];
             }
             else
             {
@@ -26,26 +26,27 @@ public class TabQ
         }
         set
         {
-            int k = StateToKey(s);
-            SafeGet(k)[a.iVal] = value;
+            SafeGet(s)[a.iVal] = value;
         }
     }
 
-    private double[] SafeGet(int k)
+    private double[] SafeGet(State s)
     {
-        if (q_.ContainsKey(k))
+        if (q_.ContainsKey(s))
         {
-            return q_[k];
+            return q_[s];
         }
         else
         {
             // Create the double array entry
-            q_[k] = new double[nActions_];
+            State s_ = new State();
+            s_.Set(s);
+            q_[s_] = new double[nActions_];
             for (int i = 0; i < nActions_; i++)
             {
-                q_[k][i] = startVal_;
+                q_[s][i] = startVal_;
             }
-            return q_[k];
+            return q_[s];
         }
     }
 
@@ -58,42 +59,15 @@ public class TabQ
         nActions_ = e.GetActions().Length;
     }
 
-    public int ArgMax(int x, int z, Knowledge knows)
-    {
-        double best = Mathf.NegativeInfinity;
-        int bestI = 0;
-        int k = IndexToKey(x, z, (int) knows);
-        int nBest = 0;
-
-        for (int i = 0; i < nActions_; i++)
-        {
-            double v = SafeGet(k)[i];
-            if (v > best)
-            {
-                nBest = 1;
-                best = v;
-                bestI = i;
-                nBest = 1;
-            }
-            else if (v == best)
-            {
-                nBest++;
-            }
-        }
-
-        return bestI;
-    }
-
     public Action ArgMax(State s)
     {
         double best = Mathf.NegativeInfinity;
         int bestI = 0;
-        int k = StateToKey(s);
         int nBest = 0;
 
         for (int i = 0; i < nActions_; i++)
         {
-            double v = SafeGet(k)[i];
+            double v = SafeGet(s)[i];
             if (v > best)
             {
                 nBest = 1;
@@ -126,10 +100,9 @@ public class TabQ
     public double Max(State s)
     {
         double best = Mathf.NegativeInfinity;
-        int k = StateToKey(s);
         for (int i = 0; i < nActions_; i++)
         {
-            double v = SafeGet(k)[i];
+            double v = SafeGet(s)[i];
             if (v > best)
             {
                 best = v;
@@ -139,41 +112,20 @@ public class TabQ
         return best;
     }
 
-    public double Max(int x, int z, Knowledge knows)
-    {
-        double best = Mathf.NegativeInfinity;
-        int k = IndexToKey(x, z, (int) knows);
-        for (int i = 0; i < nActions_; i++)
-        {
-            double v = SafeGet(k)[i];
-            if (v > best)
-            {
-                best = v;
-            }
-        }
-
-        return best;
-    }
-
-    public double Avg(int x, int z, Knowledge knows)
+    public double Avg(State s)
     {
         double sum = 0.0f;
-        int k = IndexToKey(x, z, (int) knows);
         for (int i = 0; i < nActions_; i++)
         {
-            sum += SafeGet(k)[i];
+            sum += SafeGet(s)[i];
         }
 
         return sum / nActions_;
     }
 
-    private int StateToKey(State s)
+    private State IndexToKey(int x, int z, int k)
     {
-        return IndexToKey(s.x, s.z, (int) s.knows);
-    }
-
-    private int IndexToKey(int x, int z, int k)
-    {
-        return x* depth_ + z + (width_ * depth_ * k);
+        localState_.Set(x, z, (Knowledge) k);
+        return localState_;
     }
 }

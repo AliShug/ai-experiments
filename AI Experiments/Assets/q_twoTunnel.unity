@@ -2012,12 +2012,12 @@ Prefab:
     - target: {fileID: 114555554410276330, guid: 5a2ef02c64493d64bb090a9c14d9a23c,
         type: 2}
       propertyPath: stopAfter
-      value: 20000
+      value: 150000
       objectReference: {fileID: 0}
     - target: {fileID: 114555554410276330, guid: 5a2ef02c64493d64bb090a9c14d9a23c,
         type: 2}
       propertyPath: superSpeed
-      value: 50000
+      value: 3000
       objectReference: {fileID: 0}
     - target: {fileID: 114555554410276330, guid: 5a2ef02c64493d64bb090a9c14d9a23c,
         type: 2}
@@ -2027,17 +2027,17 @@ Prefab:
     - target: {fileID: 114555554410276330, guid: 5a2ef02c64493d64bb090a9c14d9a23c,
         type: 2}
       propertyPath: endEpsilon
-      value: 0.5
+      value: 0.396
       objectReference: {fileID: 0}
     - target: {fileID: 114555554410276330, guid: 5a2ef02c64493d64bb090a9c14d9a23c,
         type: 2}
       propertyPath: startLearningRate
-      value: 0.4
+      value: 0.289
       objectReference: {fileID: 0}
     - target: {fileID: 114555554410276330, guid: 5a2ef02c64493d64bb090a9c14d9a23c,
         type: 2}
       propertyPath: endLearningRate
-      value: 0.05
+      value: 0.002
       objectReference: {fileID: 0}
     - target: {fileID: 96947733045404470, guid: 5a2ef02c64493d64bb090a9c14d9a23c,
         type: 2}
@@ -2057,12 +2057,12 @@ Prefab:
     - target: {fileID: 114555554410276330, guid: 5a2ef02c64493d64bb090a9c14d9a23c,
         type: 2}
       propertyPath: epsilonDecay
-      value: 0.0001
+      value: 0.00001
       objectReference: {fileID: 0}
     - target: {fileID: 114555554410276330, guid: 5a2ef02c64493d64bb090a9c14d9a23c,
         type: 2}
       propertyPath: learningDecay
-      value: 0.0001
+      value: 0.00004
       objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_ParentPrefab: {fileID: 100100000, guid: 5a2ef02c64493d64bb090a9c14d9a23c, type: 2}
@@ -3806,8 +3806,8 @@ MonoBehaviour:
   width: 19
   depth: 12
   moveCost: -0.15
-  successReward: 5
-  punishmentCost: -2
+  successReward: 15
+  punishmentCost: -5
   slidiness: 0.1
   camera: {fileID: 1565638274}
   rewardMode: 3
