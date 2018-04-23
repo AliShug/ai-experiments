@@ -35,6 +35,35 @@ public enum RewardMode : int
     Reward_Random,
 }
 
+public struct TileAnim
+{
+    public Material mat;
+    public int lastHit;
+    public Color originalColor;
+    public bool grayed;
+
+    public void AnimColor(int frame, float animTime)
+    {
+        if (mat == null) return;
+
+        if (grayed)
+        {
+            mat.color = Color.gray;
+        }
+        else
+        {
+            mat.color = Color.Lerp(Color.white, originalColor, (frame - lastHit) / animTime);
+        }
+    }
+
+    public void ClearColor()
+    {
+        if (mat == null) return;
+
+        mat.color = originalColor;
+    }
+}
+
 [ExecuteInEditMode]
 public class Environment : MonoBehaviour
 {
@@ -44,6 +73,7 @@ public class Environment : MonoBehaviour
     public double moveCost = -0.05f;
     public double successReward = 2.0f;
     public double punishmentCost = -2.0f;
+    public double collisionCost = -0.5f;
     
     // How likely we are to end up in an adjacent square
     public double slidiness = 0.1f;
@@ -60,6 +90,9 @@ public class Environment : MonoBehaviour
     private Tile[][] world_;
     private Action[] actions_;
     private WorldType worldType_ = WorldType.REWARDS_BOTH;
+
+    // Tile animations
+    private TileAnim goalAAnim_, goalBAnim_;
 
     // Spawned object logic
     private GameObject floor_;
@@ -94,14 +127,20 @@ public class Environment : MonoBehaviour
             else if (obj.tag == "Tile_Reward_A")
             {
                 world_[(int)child.localPosition.x][(int)child.localPosition.z] = Tile.REWARD_A;
+                if (goalAAnim_.mat == null)
+                {
+                    goalAAnim_.mat = obj.GetComponent<Renderer>().sharedMaterial;
+                    goalAAnim_.originalColor = goalAAnim_.mat.color;
+                }
             }
             else if (obj.tag == "Tile_Reward_B")
             {
                 world_[(int)child.localPosition.x][(int)child.localPosition.z] = Tile.REWARD_B;
-            }
-            else if (obj.tag == "Tile_Reward_B")
-            {
-                world_[(int)child.localPosition.x][(int)child.localPosition.z] = Tile.REWARD_B;
+                if (goalBAnim_.mat == null)
+                {
+                    goalBAnim_.mat = obj.GetComponent<Renderer>().sharedMaterial;
+                    goalBAnim_.originalColor = goalBAnim_.mat.color;
+                }
             }
             else if (obj.tag == "Tile_Wall")
             {
@@ -151,6 +190,9 @@ public class Environment : MonoBehaviour
         {
             worldType_ = (WorldType) rewardMode;
         }
+
+        goalAAnim_.grayed = false;
+        goalBAnim_.grayed = false;
     }
 
     // Modifies the state 'next' to be the state resulting from the transition
@@ -172,7 +214,7 @@ public class Environment : MonoBehaviour
                 if (IsWall(next))
                 {
                     next.z--;
-                    reward += moveCost * 5;
+                    reward += collisionCost;
                 }
                 else if (slip)
                 {
@@ -180,7 +222,7 @@ public class Environment : MonoBehaviour
                     if (IsWall(next))
                     {
                         next.x -= slide;
-                        reward += moveCost * 5;
+                        reward += collisionCost;
                     }
                 }
                 break;
@@ -189,7 +231,7 @@ public class Environment : MonoBehaviour
                 if (IsWall(next))
                 {
                     next.x--;
-                    reward += moveCost * 5;
+                    reward += collisionCost;
                 }
                 else if (slip)
                 {
@@ -197,7 +239,7 @@ public class Environment : MonoBehaviour
                     if (IsWall(next))
                     {
                         next.z -= slide;
-                        reward += moveCost * 5;
+                        reward += collisionCost;
                     }
                 }
                 break;
@@ -206,7 +248,7 @@ public class Environment : MonoBehaviour
                 if (IsWall(next))
                 {
                     next.z++;
-                    reward += moveCost * 5;
+                    reward += collisionCost;
                 }
                 else if (slip)
                 {
@@ -214,7 +256,7 @@ public class Environment : MonoBehaviour
                     if (IsWall(next))
                     {
                         next.x -= slide;
-                        reward += moveCost * 5;
+                        reward += collisionCost;
                     }
                 }
                 break;
@@ -223,7 +265,7 @@ public class Environment : MonoBehaviour
                 if (IsWall(next))
                 {
                     next.x++;
-                    reward += moveCost * 5;
+                    reward += collisionCost;
                 }
                 else if (slip)
                 {
@@ -231,7 +273,7 @@ public class Environment : MonoBehaviour
                     if (IsWall(next))
                     {
                         next.z -= slide;
-                        reward += moveCost * 5;
+                        reward += collisionCost;
                     }
                 }
                 break;
@@ -241,10 +283,17 @@ public class Environment : MonoBehaviour
         end = false;
         if (worldType_ == WorldType.REWARDS_BOTH)
         {
-            if (IsReward(next))
+            if (IsReward(next, Tile.REWARD_A))
             {
                 reward += successReward;
                 end = true;
+                goalAAnim_.lastHit = frame_;
+            }
+            else if (IsReward(next, Tile.REWARD_B))
+            {
+                reward += successReward;
+                end = true;
+                goalBAnim_.lastHit = frame_;
             }
         }
         else if (worldType_ == WorldType.REWARDS_A)
@@ -253,11 +302,13 @@ public class Environment : MonoBehaviour
             {
                 reward += successReward;
                 end = true;
+                goalAAnim_.lastHit = frame_;
             }
             else if (IsReward(next, Tile.REWARD_B))
             {
                 // Agent gets no reward, but now knows it's not in a REWARDS_B world
                 next.knows = Knowledge.VISITED_B;
+                goalBAnim_.grayed = true;
             }
         }
         else if (worldType_ == WorldType.REWARDS_B)
@@ -266,11 +317,13 @@ public class Environment : MonoBehaviour
             {
                 reward += successReward;
                 end = true;
+                goalBAnim_.lastHit = frame_;
             }
             else if (IsReward(next, Tile.REWARD_A))
             {
                 // Now knows it's not in a REWARDS_A world
                 next.knows = Knowledge.VISITED_A;
+                goalAAnim_.grayed = true;
             }
         }
 
@@ -398,13 +451,21 @@ public class Environment : MonoBehaviour
     }
 
     // Editor update logic
-
+    private int frame_ = 0;
     void Update()
     {
         if (!Application.isPlaying && dirty_)
         {
             Start();
             dirty_ = false;
+        }
+        else if (Application.isPlaying)
+        {
+            // Material updates
+            float animTime = 10;
+            goalAAnim_.AnimColor(frame_, animTime);
+            goalBAnim_.AnimColor(frame_, animTime);
+            frame_++;
         }
     }
 
@@ -443,5 +504,11 @@ public class Environment : MonoBehaviour
         {
             depth = 200;
         }
+    }
+
+    private void OnDestroy()
+    {
+        goalAAnim_.ClearColor();
+        goalBAnim_.ClearColor();
     }
 }
