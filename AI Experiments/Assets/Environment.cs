@@ -71,7 +71,10 @@ public class Environment : MonoBehaviour
     public int width = 10, depth = 10;
 
     public double moveCost = -0.05f;
-    public double successReward = 2.0f;
+    public float goalAReward = 2.0f;
+    public float goalAStdDev = 0.0f;
+    public float goalBReward = 2.0f;
+    public float goalBStdDev = 0.0f;
     public double punishmentCost = -2.0f;
     public double collisionCost = -0.5f;
     
@@ -174,6 +177,9 @@ public class Environment : MonoBehaviour
         camera.transform.parent.localPosition = new Vector3(width / 2.0f - 0.5f, 0f, depth / 2.0f - 0.5f);
 
         InitFloorTexture();
+
+        goalAAnim_.lastHit = -5000;
+        goalBAnim_.lastHit = -5000;
     }
     
     // Modifies the state 'start' to be the starting state
@@ -285,13 +291,13 @@ public class Environment : MonoBehaviour
         {
             if (IsReward(next, Tile.REWARD_A))
             {
-                reward += successReward;
+                reward += GetGoalAReward();
                 end = true;
                 goalAAnim_.lastHit = frame_;
             }
             else if (IsReward(next, Tile.REWARD_B))
             {
-                reward += successReward;
+                reward += GetGoalBReward();
                 end = true;
                 goalBAnim_.lastHit = frame_;
             }
@@ -300,7 +306,7 @@ public class Environment : MonoBehaviour
         {
             if (IsReward(next, Tile.REWARD_A))
             {
-                reward += successReward;
+                reward += GetGoalAReward();
                 end = true;
                 goalAAnim_.lastHit = frame_;
             }
@@ -315,7 +321,7 @@ public class Environment : MonoBehaviour
         {
             if (IsReward(next, Tile.REWARD_B))
             {
-                reward += successReward;
+                reward += GetGoalBReward();
                 end = true;
                 goalBAnim_.lastHit = frame_;
             }
@@ -333,6 +339,25 @@ public class Environment : MonoBehaviour
             reward += punishmentCost;
             end = true;
         }
+    }
+
+    public float GetGoalAReward()
+    {
+        return GetRandomReward(goalAReward, goalAStdDev);
+    }
+
+    public float GetGoalBReward()
+    {
+        return GetRandomReward(goalBReward, goalBStdDev);
+    }
+
+    private float GetRandomReward(float mean, float stdDev)
+    {
+        float u1 = 1.0f - Random.value; //uniform(0,1] random doubles
+        float u2 = 1.0f - Random.value;
+        float randStdNormal = Mathf.Sqrt(-2.0f * Mathf.Log(u1)) *
+                     Mathf.Sin(2.0f * Mathf.PI * u2); //random normal(0,1)
+        return mean + stdDev * randStdNormal; //random normal(mean,stdDev^2)
     }
 
     public bool IsWall(State s)

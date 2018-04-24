@@ -1869,7 +1869,7 @@ Camera:
   far clip plane: 1000
   field of view: 35
   orthographic: 1
-  orthographic size: 5
+  orthographic size: 6
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
@@ -2156,7 +2156,10 @@ MonoBehaviour:
   depth: 8
   moveCost: -0.05000000074505806
   successReward: 5
+  goalAReward: 5
+  goalBReward: 0
   punishmentCost: -2
+  collisionCost: -0.5
   slidiness: 0
   camera: {fileID: 1565638274}
   rewardMode: 2

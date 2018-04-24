@@ -1522,7 +1522,10 @@ MonoBehaviour:
   depth: 19
   moveCost: -0.2
   successReward: 5
+  goalAReward: 5
+  goalBReward: 0
   punishmentCost: -2
+  collisionCost: -0.5
   slidiness: 0
   camera: {fileID: 1565638274}
   rewardMode: 0

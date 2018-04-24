@@ -1474,7 +1474,10 @@ MonoBehaviour:
   width: 19
   depth: 19
   moveCost: -0.2
-  successReward: 5
+  goalAReward: 10
+  goalAStdDev: 0
+  goalBReward: 0
+  goalBStdDev: 0
   punishmentCost: -2
   collisionCost: -0.5
   slidiness: 0

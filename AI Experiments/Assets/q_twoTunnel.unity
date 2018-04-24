@@ -2017,7 +2017,7 @@ Prefab:
     - target: {fileID: 114555554410276330, guid: 5a2ef02c64493d64bb090a9c14d9a23c,
         type: 2}
       propertyPath: superSpeed
-      value: 1
+      value: 6000
       objectReference: {fileID: 0}
     - target: {fileID: 114555554410276330, guid: 5a2ef02c64493d64bb090a9c14d9a23c,
         type: 2}
@@ -3806,14 +3806,17 @@ MonoBehaviour:
   width: 19
   depth: 12
   moveCost: -0.15
-  successReward: 15
+  goalAReward: 15
+  goalAStdDev: 0
+  goalBReward: 15
+  goalBStdDev: 0
   punishmentCost: -5
   collisionCost: -0.1
   slidiness: 0.1
   camera: {fileID: 1565638274}
   rewardMode: 3
-  displayExpectedReward: 0
-  displayPolicy: 0
+  displayExpectedReward: 1
+  displayPolicy: 1
 --- !u!4 &1841405251
 Transform:
   m_ObjectHideFlags: 0
